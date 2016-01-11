@@ -5,7 +5,7 @@ from csv import writer
 import re
 from time import sleep
 
-from lib import rada
+from rada import rada
 
 OUTPUT_FILE = 'output/legislative_activity.csv'
 NAME_STRIP = " (народний депутат VIII скл.)"
@@ -29,6 +29,7 @@ ROW_HEADERS = (
     'date',
     'bill_title',
     'law',
+    'bill_link',
     'type',
 )
 
@@ -45,22 +46,23 @@ ACT_TYPE_OTHER = "інше"
 
 print('getting acts list')
 acts = rada.list_acts()
+
 for act_number in acts:
     for act_type in ACT_TYPES:
         print(act_number)
-        if acts[act_number][1].startswith(act_type):
+        if acts[act_number][2].startswith(act_type):
             acts[act_number].append(ACT_TYPES[act_type])
-    if len(acts[act_number]) == 2:
+    if len(acts[act_number]) == 3:
         acts[act_number].append(ACT_TYPE_OTHER)
 
 print('getting deputies list')
-list = rada.list_deputy_links()
+mp_list = rada.list_deputy_links()
 
 fh = open(OUTPUT_FILE, 'w')
 csvwriter = writer(fh)
 csvwriter.writerow(ROW_HEADERS)
 
-for link in [link.attrib['href'] for link in list]:
+for link in [link.attrib['href'] for link in mp_list]:
     sleep(SLEEP_TIME)
     deputy_id_matched = DEPUTY_ID_RE.fullmatch(link)
     if deputy_id_matched:
@@ -77,7 +79,8 @@ for link in [link.attrib['href'] for link in list]:
             for subselector in ROW_SUBSELECTORS:
                 row_output.append(row_pq(subselector).text())
             if row_output[1]:
-                row_output.append(acts[row_output[1]][2])
+                row_output.append(acts[row_output[1]][0])
+                row_output.append(acts[row_output[1]][3])
                 csvwriter.writerow(row_output)
     else:
         print('Update DEPUTY_ID_RE.')
