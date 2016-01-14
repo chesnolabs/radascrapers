@@ -6,7 +6,8 @@ import re
 from csv import writer
 from pyquery import PyQuery as pq
 
-OUTPUT_FOLDER = '../output/'
+from .settings import OUTPUT_FOLDER
+
 DOCS_FOLDER = OUTPUT_FOLDER + 'docs/'
 
 BILLS_FILE = OUTPUT_FOLDER + 'bill_cards.json'
@@ -20,7 +21,6 @@ DISCUSS_SELECTOR = 'b:contains("Громадське обговорення")'
 DISCUSS_SELECTOR_2 = 'b:contains("8.")'
 
 FILENAME_PART = 'poyasn'
-FOLDER = 'output/docs/'
 EXTENSION = '.rtf'
 
 SLEEP_TIME = 0.3

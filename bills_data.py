@@ -10,6 +10,7 @@ from csv import writer
 import requests
 
 from rada import rada
+from .settings import OUTPUT_FOLDER, PERSON_IDS_FILE
 
 START_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 
@@ -34,7 +35,7 @@ COMMITEES_ROW_SELECTOR = 'tr:gt(0)'
 COMMITEES_CELLS_SELECTOR = 'td'
 VOTING_DATES_SELECTOR = 'div.fr_data'
 
-DATE_RE = re.compile("(?P<filling_date>[0-9]{2}.[0-9]{2}.[0-9]{4})")
+DATE_RE = re.compile("(?P<filling_date>\d{2}.\d{2}.\d{4})")
 
 SLEEP_TIME = 0.3
 LONG_SLEEP = 180
@@ -48,10 +49,6 @@ ACT_TYPES = {
         "Проект Постанови": 'постанова',
 }
 ACT_TYPE_OTHER = "інше"
-
-IDS_FILE = '../data/person_ids.json'
-
-OUTPUT_FOLDER = '../output/'
 
 DUMP_FILE = OUTPUT_FOLDER + 'bill_cards.json'
 GENERAL_INFO_FILE = OUTPUT_FOLDER + "bills.csv"
@@ -247,7 +244,7 @@ def download_bill(key):
     return bd
 
 # open json with MP ids
-with open(IDS_FILE) as json_data:
+with open(PERSON_IDS_FILE) as json_data:
         ids = json.load(json_data)
         json_data.close()
 

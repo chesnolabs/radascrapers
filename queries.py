@@ -5,8 +5,8 @@ import re
 from time import sleep
 
 from rada import rada
+from .settings import OUTPUT_FOLDER
 
-OUTPUT_FOLDER = '../output/'
 OUTPUT_FILE = OUTPUT_FOLDER + 'queries.csv'
 SLEEP_TIME = 0.5
 LINK_TEMPLATE = "http://w1.c1.rada.gov.ua/pls/zweb2/wcadr43D?sklikannja" \
