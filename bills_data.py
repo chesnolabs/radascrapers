@@ -35,7 +35,7 @@ COMMITEES_ROW_SELECTOR = 'tr:gt(0)'
 COMMITEES_CELLS_SELECTOR = 'td'
 VOTING_DATES_SELECTOR = 'div.fr_data'
 
-DATE_RE = re.compile("(?P<filling_date>\d{2}.\d{2}.\d{4})")
+DATE_RE = re.compile("(?P<date>\d{2}.\d{2}.\d{4})")
 
 SLEEP_TIME = 0.3
 LONG_SLEEP = 180
@@ -57,7 +57,7 @@ UNIQUE_DOCS_FILE = OUTPUT_FOLDER + "docs_list.csv"
 
 GENERAL_INFO_HEADERS = ["number", "title", "URL", "type", "filing_date",
                         "status", "initiator_type", "initiators", "committee",
-                        "committees", "convocation"]
+                        "committees", "convocation", "date_updated"]
 COMMITTEES_LIST_HEADERS = ["committee", 'convocation']
 UNIQUE_DOCS_HEADER = ["name"]
 
@@ -100,7 +100,7 @@ def write_general_info(key):
                   change_date_format(b['date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
-                  b['convocation']]
+                  b['convocation'], b['date_updated']]
     general_info_writer.writerow(output_row)
 
 
@@ -138,7 +138,7 @@ def get_docs(x):
     text = pq(x).text()
     date_matched = DATE_RE.search(text)
     if date_matched is not None:
-        date = change_date_format(date_matched.group("filling_date"))
+        date = change_date_format(date_matched.group("date"))
     else:
         date = ""
     name = DATE_RE.sub('', text).strip()
@@ -161,7 +161,18 @@ def get_bills_features(link):
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
         features['last_status'] = page(LAST_STATUS_SELECTOR).text()
-        features['last_stage'] = page(LAST_STAGE_SELECTOR).text()
+        last_stage_line = page(LAST_STAGE_SELECTOR).text()
+        print(last_stage_line)
+        date_updated_matched = DATE_RE.search(last_stage_line)
+        if date_updated_matched:
+            date_updated = change_date_format(
+                                date_updated_matched.group('date'))
+        else:
+            date_updated = ''
+        last_stage = last_stage_line.split("(")[0].strip()
+        print(last_stage, date_updated)
+        features['last_stage'] = last_stage
+        features['date_updated'] = date_updated
         features['convocation'] = "Верховна Рада 8"
         features['bill_docs'] = {}
         bill_docs = page(BILL_DOCS_SELECTOR).next()('li a')
