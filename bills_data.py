@@ -10,7 +10,7 @@ from csv import writer
 import requests
 
 from rada import rada
-from settings import OUTPUT_FOLDER, PERSON_IDS_FILE
+from .settings import OUTPUT_FOLDER, PERSON_IDS_FILE
 
 START_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 
@@ -57,7 +57,7 @@ UNIQUE_DOCS_FILE = OUTPUT_FOLDER + "docs_list.csv"
 
 GENERAL_INFO_HEADERS = ["number", "title", "URL", "type", "filing_date",
                         "status", "initiator_type", "initiators", "committee",
-                        "committees", "convocation", "date_updated"]
+                        "committees", "convocation", "last_updated"]
 COMMITTEES_LIST_HEADERS = ["committee", 'convocation']
 UNIQUE_DOCS_HEADER = ["name"]
 
@@ -100,7 +100,7 @@ def write_general_info(key):
                   change_date_format(b['filing_date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
-                  b['convocation'], b['date_updated']]
+                  b['convocation'], b['last_updated']]
     general_info_writer.writerow(output_row)
 
 
@@ -162,17 +162,15 @@ def get_bills_features(link):
             ).replace('</li>', '').split('<li>')[1:]
         features['last_status'] = page(LAST_STATUS_SELECTOR).text()
         last_stage_line = page(LAST_STAGE_SELECTOR).text()
-        print(last_stage_line)
-        date_updated_matched = DATE_RE.search(last_stage_line)
-        if date_updated_matched:
-            date_updated = change_date_format(
-                                date_updated_matched.group('date'))
+        last_updated_matched = DATE_RE.search(last_stage_line)
+        if last_updated_matched:
+            last_updated = change_date_format(
+                                last_updated_matched.group('date'))
         else:
-            date_updated = ''
+            last_updated = ''
         last_stage = last_stage_line.split("(")[0].strip()
-        print(last_stage, date_updated)
         features['last_stage'] = last_stage
-        features['date_updated'] = date_updated
+        features['last_updated'] = last_updated
         features['convocation'] = "Верховна Рада 8"
         features['bill_docs'] = {}
         bill_docs = page(BILL_DOCS_SELECTOR).next()('li a')
