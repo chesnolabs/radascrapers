@@ -10,7 +10,7 @@ from csv import writer
 import requests
 
 from rada import rada
-from .settings import OUTPUT_FOLDER, PERSON_IDS_FILE
+from settings import OUTPUT_FOLDER, PERSON_IDS_FILE
 
 START_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 
@@ -97,7 +97,7 @@ def write_general_info(key):
     b = bills_dict[key]
     authors_str = map(lambda x: str(x), b['authors']['id'])
     output_row = [key, b["title"], b['link'], b['type'],
-                  change_date_format(b['date']), b['last_status'],
+                  change_date_format(b['filing_date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
                   b['convocation'], b['date_updated']]
@@ -247,7 +247,7 @@ def download_bill(key):
         bill_list[key].append(ACT_TYPE_OTHER)
     bd = {}
     bd["link"] = bill_list[key][0]
-    bd["date"] = bill_list[key][1]
+    bd["filing_date"] = bill_list[key][1]
     bd["title"] = bill_list[key][2]
     bd["type"] = bill_list[key][3]
     bd["update_time"] = int(datetime.datetime.now().strftime("%s"))
