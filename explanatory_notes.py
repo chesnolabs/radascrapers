@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# coding:utf-8
+
 import json
 import urllib.request
 import time
@@ -6,7 +9,7 @@ import re
 from csv import writer
 from pyquery import PyQuery as pq
 
-from .settings import OUTPUT_FOLDER
+from settings import OUTPUT_FOLDER
 
 DOCS_FOLDER = OUTPUT_FOLDER + 'docs/'
 

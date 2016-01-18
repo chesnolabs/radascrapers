@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# coding:utf-8
+
 import os
 import re
 from pyquery import PyQuery as pq
@@ -10,12 +13,10 @@ from csv import writer
 import requests
 
 from rada import rada
-from .settings import OUTPUT_FOLDER, PERSON_IDS_FILE
+from settings import OUTPUT_FOLDER, PERSON_IDS_FILE
 
 START_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 
-BILL_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/webproc4_1?'\
-             'pf3511=55885#ui-tabs-2'
 LIST_ELEMENT = 'ul#gol_v'
 ELEMENT_LINK_TAG = 'li a'
 INITIATOR_SELECTOR = 'div.zp-info dt:contains'\
@@ -147,7 +148,7 @@ def get_docs(x):
 
 
 def get_bills_features(link):
-        print(link)
+        # print(link)
         try:
             page = pq(url=link, opener=pq_opener)
         except Exception:
@@ -274,7 +275,7 @@ while flag:
             json_dump.close()
     else:
         bills_dict = {}
-    print("Downloading bills...")
+    # print("Downloading bills...")
     bills_downloaded = False
     attempt = 1
     while not bills_downloaded and attempt <= NUMBER_OF_ATTEMPTS:
@@ -290,7 +291,7 @@ while flag:
         break
     keys = list(bill_list.keys())
     for i in range(len(keys)):
-        print(str(i + 1) + " from " + str(len(keys)))
+        # print(str(i + 1) + " from " + str(len(keys)))
         key = keys[i]
         if key in bills_dict.keys():
             now = int(datetime.datetime.now().strftime("%s"))

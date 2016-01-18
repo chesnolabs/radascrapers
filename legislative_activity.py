@@ -6,7 +6,7 @@ import re
 from time import sleep
 
 from rada import rada
-from .settings import OUTPUT_FOLDER
+from settings import OUTPUT_FOLDER
 
 OUTPUT_FILE = OUTPUT_FOLDER + 'legislative_activity.csv'
 NAME_STRIP = " (народний депутат VIII скл.)"

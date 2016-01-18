@@ -1,8 +1,5 @@
 PyQuery
 httplib2
 pytz
-dateutil
-json
-csv
+python-dateutil
 requests
-urllib

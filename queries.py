@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# coding:utf-8
+
 from pyquery import PyQuery as pq
 from csv import writer
 import re
