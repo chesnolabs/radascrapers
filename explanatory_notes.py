@@ -18,7 +18,8 @@ OUTPUT_FILE = OUTPUT_FOLDER + 'discusses.csv'
 DOCS_TYPE = 'Пояснювальна записка'
 INITIATOR_TYPES = ["кабмін"]
 
-OUTPUT_HEADERS = ["number", "title", "social_partners", "civic_society"]
+OUTPUT_HEADERS = ["number", "title", "authority",
+                  "social_partners", "civic_society"]
 
 DISCUSS_SELECTOR = 'b:contains("Громадське обговорення")'
 DISCUSS_SELECTOR_2 = 'b:contains("8.")'
@@ -69,6 +70,18 @@ def social_partners_paragraph(p, s=''):
         return social_partners_paragraph(
                     pq(p).parent(), s + " " + pq(p).text().strip())
 
+
+def authority_paragraph(p):
+    # print(pq(p).text())
+    if ("України" in pq(p).text()) or (
+      "міністр" in pq(p).text().lower()):
+        return pq(p).prev().text() + " " + pq(p).text()
+    elif pq(p).prev() != None:
+        return authority_paragraph(pq(p).prev())
+    else:
+        return authority_paragraph(pq(p).parent().prev())
+
+
 output_csv = open(OUTPUT_FILE, 'w')
 output_csv_writer = writer(output_csv)
 output_csv_writer.writerow(OUTPUT_HEADERS)
@@ -93,7 +106,10 @@ for k in bills_dict.keys():
             h_filename = filename.replace(".rtf", ".html")
             try:
                 page = pq(filename=h_filename)
-                civic_discusses = page('body').children().filter(
+                page = page('body')
+                while len(page) == 1:
+                    page = page.children()
+                civic_discusses = page.filter(
                     lambda i: ("Громадське" in pq(this).text()) and
                     ("обговорення" in pq(this).text()))
                 if len(civic_discusses) > 0:
@@ -107,7 +123,7 @@ for k in bills_dict.keys():
                                                      civic_discusses_results)
                 else:
                     civic_discusses_results = ''
-                social_partners = page('body').children().filter(
+                social_partners = page.filter(
                     lambda i: ("соціальних" in pq(this).text()) and
                     ("партнерів" in pq(this).text()))
                 if len(social_partners) > 0:
@@ -122,15 +138,21 @@ for k in bills_dict.keys():
                                                     social_partners_results)
                 else:
                     social_partners_results = ''
+                authority = authority_paragraph(page[-1]).strip()
+                authority = re.sub(
+                                r"\s+", ' ',
+                                authority)
             except Exception:
                 problematic_bills.append(k)
                 civic_discusses_results = ''
                 social_partners_results = ''
+                authority = ''
             if "не потребує" in civic_discusses_results:
                 do_not_need_consults += 1
             print(civic_discusses_results)
             print(social_partners_results)
-            output_row = [k, bills_dict[k]['title'],
+            print(authority)
+            output_row = [k, bills_dict[k]['title'], authority,
                           social_partners_results, civic_discusses_results]
             output_csv_writer.writerow(output_row)
 
