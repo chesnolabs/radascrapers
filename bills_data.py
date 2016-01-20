@@ -126,6 +126,10 @@ def write_committees_list():
     committees_list_csv.close()
 
 
+def committee_strip(s):
+    return s.replace("Комітет Верховної Ради України", "Комітет")
+
+
 def write_docs_list():
     docs_list_csv = open(UNIQUE_DOCS_FILE, 'w')
     docs_list_writer = writer(docs_list_csv)
@@ -155,12 +159,14 @@ def get_bills_features(link):
             return {}
         features = {}
         features['initiator'] = page(INITIATOR_SELECTOR).next().text()
-        features['main_committee'] = page(
+        features['main_committee'] = committee_strip(page(
                                         MAIN_COMMITTEE_SELECTOR
-                                        ).next().text()
-        features['others_committees'] = str(
+                                        ).next().text())
+        other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
+        features['others_committees'] = list(map(
+            committee_strip, other_committees_raw))
         features['last_status'] = page(LAST_STATUS_SELECTOR).text()
         last_stage_line = page(LAST_STAGE_SELECTOR).text()
         last_updated_matched = DATE_RE.search(last_stage_line)
@@ -191,11 +197,11 @@ def get_bills_features(link):
                                                      docs_list))
         authors = page(AUTHORS_SELECTOR).text()
         if "Президент" in authors:
-            features['initiator_type'] = "президент"
+            features['initiator_type'] = "Президент України"
         elif "Міністрів" in authors:
-            features['initiator_type'] = "кабмін"
+            features['initiator_type'] = "Кабінет Міністрів України"
         else:
-            features['initiator_type'] = "депутат"
+            features['initiator_type'] = "Народний депутат України"
         features['authors'] = {}
         if CONVOCATION_NUMBER.search(authors):
             authors = CONVOCATION_NUMBER.split(authors)
