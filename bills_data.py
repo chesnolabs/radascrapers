@@ -26,7 +26,7 @@ CONVOCATION_NUMBER = re.compile("\(VI?I?I? скликання\)")
 MAIN_COMMITTEE_SELECTOR = 'div.zp-info dt:contains("Головний комітет:")'
 OTHERS_COMMITTEES_SELECTOR = 'div.zp-info dt:contains("Інші комітети:")'
 LAST_STATUS_SELECTOR = 'div#flow_tab th:eq(1)'
-LAST_STAGE_SELECTOR = 'div#flow_tab td:eq(1)'
+STAGE_SELECTOR = 'div#flow_tab tr:gt(0)'
 BILL_DOCS_SELECTOR = 'div.zp-info dt:contains("Текст законопроекту")'
 FLOW_DOCS_SELECTOR = 'div.zp-info dt:contains("язані із роботою")'
 FLOW_LINK_SELECTOR = 'div.tabs_block li:last a'
@@ -34,6 +34,9 @@ FLOW_LINK_TEMPLATE = 'http://w1.c1.rada.gov.ua'
 COMMITEES_TABLE_SELECTOR = 'div#kom_processing_tab table:eq(0)'
 COMMITEES_ROW_SELECTOR = 'tr:gt(0)'
 COMMITEES_CELLS_SELECTOR = 'td'
+EDITION_SELECTOR = 'div.zp-info dt:contains("Редакція законопроекту")'
+SPHERE_SELECTOR = 'div.zp-info dt:contains("Рубрика законопроекту")'
+
 VOTING_DATES_SELECTOR = 'div.fr_data'
 
 DATE_RE = re.compile("(?P<date>\d{2}.\d{2}.\d{4})")
@@ -101,7 +104,7 @@ def write_general_info(key):
                   change_date_format(b['filing_date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
-                  b['convocation'], b['last_updated']]
+                  b['convocation'], b['dates_updated'][0]]
     general_info_writer.writerow(output_row)
 
 
@@ -127,6 +130,8 @@ def write_committees_list():
 
 
 def committee_strip(s):
+    if '.' in s:
+        s = s.split('.')[-1].strip()
     return s.replace("Комітет Верховної Ради України", "Комітет")
 
 
@@ -151,6 +156,13 @@ def get_docs(x):
     return name, date, link
 
 
+def get_updates(x):
+    x = pq(x)
+    date = change_date_format(x('td:eq(0)').text())
+    stage = x('td:eq(1)').text()
+    return stage, date
+
+
 def get_bills_features(link):
         # print(link)
         try:
@@ -159,6 +171,8 @@ def get_bills_features(link):
             return {}
         features = {}
         features['initiator'] = page(INITIATOR_SELECTOR).next().text()
+        features['edition'] = page(EDITION_SELECTOR).next().text()
+        features['sphere'] = page(SPHERE_SELECTOR).next().text()
         features['main_committee'] = committee_strip(page(
                                         MAIN_COMMITTEE_SELECTOR
                                         ).next().text())
@@ -168,16 +182,9 @@ def get_bills_features(link):
         features['others_committees'] = list(map(
             committee_strip, other_committees_raw))
         features['last_status'] = page(LAST_STATUS_SELECTOR).text()
-        last_stage_line = page(LAST_STAGE_SELECTOR).text()
-        last_updated_matched = DATE_RE.search(last_stage_line)
-        if last_updated_matched:
-            last_updated = change_date_format(
-                                last_updated_matched.group('date'))
-        else:
-            last_updated = ''
-        last_stage = last_stage_line.split("(")[0].strip()
-        features['last_stage'] = last_stage
-        features['last_updated'] = last_updated
+        stage_lines = list(map(get_updates, page(STAGE_SELECTOR)))
+        features['stages'] = list(map(lambda x: x[0], stage_lines))
+        features['dates_updated'] = list(map(lambda x: x[1], stage_lines))
         features['convocation'] = "Верховна Рада 8"
         features['bill_docs'] = {}
         bill_docs = page(BILL_DOCS_SELECTOR).next()('li a')
