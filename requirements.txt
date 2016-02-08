@@ -3,3 +3,4 @@ httplib2
 pytz
 python-dateutil
 requests
+pysocks
