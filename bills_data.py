@@ -10,6 +10,8 @@ import datetime
 import pytz
 import json
 from csv import writer
+import socks
+import socket
 import requests
 
 from rada import rada
@@ -265,6 +267,12 @@ def download_bill(key):
     bd["update_time"] = int(datetime.datetime.now().strftime("%s"))
     bd.update(get_bills_features(bd["link"]))
     return bd
+
+# setting sockets to run script anonymously
+socks.setdefaultproxy(
+    proxy_type=socks.PROXY_TYPE_SOCKS5,
+    addr="127.0.0.1", port=9050)
+socket.socket = socks.socksocket
 
 # open json with MP ids
 with open(PERSON_IDS_FILE) as json_data:
