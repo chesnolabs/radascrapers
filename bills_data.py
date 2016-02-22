@@ -222,19 +222,19 @@ def get_bills_features(link):
             authors = un_standard_names(authors)
             features['authors']['name'] = authors
             features['authors']['id'] = list(map(lambda s: ids[s], authors))
-        flow_link = FLOW_LINK_TEMPLATE + page(FLOW_LINK_SELECTOR).attr('href')
         try:
+            flow_link = FLOW_LINK_TEMPLATE + page(FLOW_LINK_SELECTOR).attr('href')
             flow_page = pq(url=flow_link, opener=pq_opener)
+            dates_times = flow_page(VOTING_DATES_SELECTOR).text().split()
+            dates = dates_times[0::2]
+            times = dates_times[1::2]
+            features['voting_ids'] = list(
+                map(lambda d, t: int(parser.parse(
+                    d + ' ' + t, tzinfos=datetime.timedelta(0),
+                    dayfirst=True)
+                    .replace(tzinfo=pytz.utc).timestamp()), dates, times))
         except Exception:
-            return {}
-        dates_times = flow_page(VOTING_DATES_SELECTOR).text().split()
-        dates = dates_times[0::2]
-        times = dates_times[1::2]
-        features['voting_ids'] = list(
-            map(lambda d, t: int(parser.parse(
-                d + ' ' + t, tzinfos=datetime.timedelta(0),
-                dayfirst=True)
-                .replace(tzinfo=pytz.utc).timestamp()), dates, times))
+            print(link)
         commitees_flow = {}
         commitees = page(COMMITEES_TABLE_SELECTOR)
         commitees = pq(commitees)
