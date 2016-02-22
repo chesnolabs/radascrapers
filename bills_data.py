@@ -234,6 +234,7 @@ def get_bills_features(link):
                     dayfirst=True)
                     .replace(tzinfo=pytz.utc).timestamp()), dates, times))
         except Exception:
+            features['voting_ids'] = []
             print(link)
         commitees_flow = {}
         commitees = page(COMMITEES_TABLE_SELECTOR)
