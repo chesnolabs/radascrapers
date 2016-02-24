@@ -106,7 +106,8 @@ def write_general_info(key):
                   change_date_format(b['filing_date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
-                  b['convocation'], b['dates_updated'][0]]
+                  b['convocation'],
+                  b['dates_updated'] and b['dates_updated'][0] or ""]
     general_info_writer.writerow(output_row)
 
 
