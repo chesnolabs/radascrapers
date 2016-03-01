@@ -168,7 +168,7 @@ def get_updates(x):
 
 
 def get_bills_features(link):
-        print(link)
+        # print(link)
         try:
             page = pq(url=link, opener=pq_opener)
         except Exception:
