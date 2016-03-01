@@ -42,6 +42,7 @@ SPHERE_SELECTOR = 'div.zp-info dt:contains("Рубрика законопрое�
 VOTING_DATES_SELECTOR = 'div.fr_data'
 
 DATE_RE = re.compile("(?P<date>\d{2}.\d{2}.\d{4})")
+COMMITTEE_HEAD_RE = re.compile('(.*[Є-ЯҐA-Z]\.)?(.*)')
 
 SLEEP_TIME = 0.3
 LONG_SLEEP = 180
@@ -106,7 +107,8 @@ def write_general_info(key):
                   change_date_format(b['filing_date']), b['last_status'],
                   b['initiator_type'], ','.join(authors_str),
                   b['main_committee'], "|".join(b['others_committees']),
-                  b['convocation'], b['dates_updated'][0]]
+                  b['convocation'],
+                  b['dates_updated'] and b['dates_updated'][0] or ""]
     general_info_writer.writerow(output_row)
 
 
@@ -131,10 +133,10 @@ def write_committees_list():
     committees_list_csv.close()
 
 
-def committee_strip(s):
-    if '.' in s:
-        s = s.split('.')[-1].strip()
-    return s.replace("Комітет Верховної Ради України", "Комітет")
+def committee_strip(committee_dd_text):
+    committee_name = COMMITTEE_HEAD_RE.match(committee_dd_text)\
+        .groups()[-1].strip()
+    return committee_name.replace("Комітет Верховної Ради України", "Комітет")
 
 
 def write_docs_list():
@@ -166,7 +168,7 @@ def get_updates(x):
 
 
 def get_bills_features(link):
-        # print(link)
+        print(link)
         try:
             page = pq(url=link, opener=pq_opener)
         except Exception:
@@ -175,9 +177,12 @@ def get_bills_features(link):
         features['initiator'] = page(INITIATOR_SELECTOR).next().text()
         features['edition'] = page(EDITION_SELECTOR).next().text()
         features['sphere'] = page(SPHERE_SELECTOR).next().text()
-        features['main_committee'] = committee_strip(page(
-                                        MAIN_COMMITTEE_SELECTOR
-                                        ).next().text())
+        committee_dd_text = page(MAIN_COMMITTEE_SELECTOR).next('dd').text()
+        features['main_committee'] = \
+            committee_strip(committee_dd_text)
+        if not features['main_committee']:
+            features['main_committee'] = committee_dd_text
+            print(link, "committee", committee_dd_text)
         other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
@@ -214,7 +219,7 @@ def get_bills_features(link):
         features['authors'] = {}
         if CONVOCATION_NUMBER.search(authors):
             authors = CONVOCATION_NUMBER.split(authors)
-            authors = authors[0:len(authors)-1]
+            authors = authors[:-1]
             authors = list(map(lambda s: s.strip(), authors))
             features['authors']['name'] = authors
             features['authors']['id'] = list(map(lambda s: ids[s], authors))
@@ -223,7 +228,8 @@ def get_bills_features(link):
             features['authors']['name'] = authors
             features['authors']['id'] = list(map(lambda s: ids[s], authors))
         try:
-            flow_link = FLOW_LINK_TEMPLATE + page(FLOW_LINK_SELECTOR).attr('href')
+            flow_link = FLOW_LINK_TEMPLATE + \
+                page(FLOW_LINK_SELECTOR).attr('href')
             flow_page = pq(url=flow_link, opener=pq_opener)
             dates_times = flow_page(VOTING_DATES_SELECTOR).text().split()
             dates = dates_times[0::2]
@@ -233,9 +239,9 @@ def get_bills_features(link):
                     d + ' ' + t, tzinfos=datetime.timedelta(0),
                     dayfirst=True)
                     .replace(tzinfo=pytz.utc).timestamp()), dates, times))
-        except Exception:
+        except Exception as e:
             features['voting_ids'] = []
-            print(link)
+            print(link, str(e))
         commitees_flow = {}
         commitees = page(COMMITEES_TABLE_SELECTOR)
         commitees = pq(commitees)
@@ -322,7 +328,7 @@ while flag:
         else:
             bills_dict[key] = download_bill(key)
         if flag:
-            print("Something got wrong, taking a rest...")
+            print("Something went wrong, taking a rest...")
             time.sleep(LONG_SLEEP)
             break
         if bills_dict[key]['bill_docs'] != {}:

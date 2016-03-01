@@ -22,7 +22,8 @@ ACT_SUBSELECTORS = (
     'td:nth-child(3)',
 )
 
-USERAGENT = "Mozilla/5.0 (X11; Linux i686) (KHTML, Gecko) Chrome/40.0.1234.56"
+USERAGENT = \
+    "Mozilla/5.0 (X11; Linux i686; rv:44.0) Gecko/20100101 Firefox/44.0"
 
 http = Http('.cache', timeout=10)
 
@@ -33,15 +34,18 @@ def list_deputy_links():
 
 
 def list_acts(return_list=False, additional_filter=''):
-    q = pq(url=ACTS_LIST_URL.format(**{'parliament': ACTS_PARLIAMENT_NUMBER, 'additional_filter': additional_filter}))
+    q = pq(url=ACTS_LIST_URL.format(**{
+        'parliament': ACTS_PARLIAMENT_NUMBER,
+        'additional_filter': additional_filter}))
     acts_list = list()
     for act in q(ACT_SELECTOR):
         act_pq = pq(act)
         row = list()
         for subselector in ACT_SUBSELECTORS:
-                row.append(act_pq(subselector).text())
-                if subselector == 'td:nth-child(1) a':
-                    row.append(ACT_LINK_TEMPLATE.format(**{'relative_link': str(act_pq(subselector).attr("href"))}))
+            row.append(act_pq(subselector).text())
+            if subselector == 'td:nth-child(1) a':
+                row.append(ACT_LINK_TEMPLATE.format(**{
+                    'relative_link': str(act_pq(subselector).attr("href"))}))
         if row[0]:
             acts_list.append(row)
     if return_list:
@@ -58,8 +62,8 @@ def list_bills(return_list=False):
 
 def download(url, filename):
     try:
-        response, content = \
-            http.request(url, headers={'User-Agent': USERAGENT})
+        content = \
+            http.request(url, headers={'User-Agent': USERAGENT})[1]
 
         with open(filename, 'wb') as filehandler:
             filehandler.write(content)
