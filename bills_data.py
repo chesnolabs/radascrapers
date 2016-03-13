@@ -3,19 +3,23 @@
 
 import os
 import re
-from pyquery import PyQuery as pq
-from dateutil import parser
 import time
 import datetime
-import pytz
 import json
 from csv import writer
-import socks
 import socket
+from traceback import format_exc
+import argparse
+import logging as log
+
+from pyquery import PyQuery as pq
+from dateutil import parser
+import pytz
+import socks
 import requests
 
 from rada import rada
-from settings import OUTPUT_FOLDER, PERSON_IDS_FILE
+from settings import OUTPUT_FOLDER, PERSON_IDS_FILE, HTTP_CODES_OK
 
 START_URL = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 
@@ -68,22 +72,32 @@ GENERAL_INFO_HEADERS = ["number", "title", "URL", "type", "filing_date",
 COMMITTEES_LIST_HEADERS = ["committee", 'convocation']
 UNIQUE_DOCS_HEADER = ["name"]
 
-
-def dump_dict():
-    with open(DUMP_FILE, 'w') as fp:
-        json.dump(bills_dict, fp)
+argparser = argparse.ArgumentParser()
+argparser.add_argument('-d', '--debug', action='store_true', help='debug mode')
+args = argparser.parse_args()
+log.basicConfig(
+    format='%(levelname)s:%(message)s',
+    level=(args.debug and log.DEBUG or log.WARNING))
+log.debug('Debug mode active.')
 
 
 def pq_opener(url, **kwargs):
-    time.sleep(SLEEP_TIME)
-    try:
-        r = requests.get(url)
-        return r.text
-    except Exception:
-        global flag
-        flag = True
-        dump_dict()
-        print("An error occurred. The dictionary has been dumped.")
+    attempt = 0
+    while attempt < NUMBER_OF_ATTEMPTS:
+        attempt += 1
+        time.sleep(SLEEP_TIME)
+        try:
+            r = requests.get(url)
+            if r.status_code in HTTP_CODES_OK:
+                return r.text
+        except Exception:
+            log.warning(
+                "Failed to download {} with status {}"
+                .format(url, r.status_code))
+            log.warning(format_exc())
+    global scrapper_failed
+    scrapper_failed = True
+    return None
 
 
 def change_date_format(s):
@@ -167,8 +181,42 @@ def get_updates(x):
     return stage, date
 
 
+def parse_date(d, t):
+    combined_datetime = '{} {}'.format(d, t)
+    try:
+        date = parser.parse(
+            combined_datetime,
+            tzinfos=datetime.timedelta(0),
+            dayfirst=True)
+        date = date.replace(tzinfo=pytz.utc)
+        return int(date.timestamp())
+    except Exception as e:
+        log.error(combined_datetime)
+        log.error(str(e))
+        log.error(format_exc())
+        return 0
+
+
+def get_voting_ids(flow_link):
+    flow_parsed = False
+    attempt = 0
+    while attempt < NUMBER_OF_ATTEMPTS or not flow_parsed:
+        attempt += 1
+        try:
+            flow_page = pq(url=flow_link, opener=pq_opener)
+            dates_times = flow_page(VOTING_DATES_SELECTOR).text().split()
+            dates = dates_times[0::2]
+            times = dates_times[1::2]
+            voting_ids = list(map(parse_date, dates, times))
+            flow_parsed = True
+            return voting_ids
+        except Exception:
+            log.error(flow_link)
+            log.error(format_exc())
+    return []
+
+
 def get_bills_features(link):
-        # print(link)
         try:
             page = pq(url=link, opener=pq_opener)
         except Exception:
@@ -182,7 +230,12 @@ def get_bills_features(link):
             committee_strip(committee_dd_text)
         if not features['main_committee']:
             features['main_committee'] = committee_dd_text
-            print(link, "committee", committee_dd_text)
+            log.critical(link)
+            committee_html = page(MAIN_COMMITTEE_SELECTOR).outer_html()
+            if committee_html:
+                log.critical(committee_html)
+            else:
+                log.critical(page.outer_html())
         other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
@@ -230,18 +283,14 @@ def get_bills_features(link):
         try:
             flow_link = FLOW_LINK_TEMPLATE + \
                 page(FLOW_LINK_SELECTOR).attr('href')
-            flow_page = pq(url=flow_link, opener=pq_opener)
-            dates_times = flow_page(VOTING_DATES_SELECTOR).text().split()
-            dates = dates_times[0::2]
-            times = dates_times[1::2]
-            features['voting_ids'] = list(
-                map(lambda d, t: int(parser.parse(
-                    d + ' ' + t, tzinfos=datetime.timedelta(0),
-                    dayfirst=True)
-                    .replace(tzinfo=pytz.utc).timestamp()), dates, times))
-        except Exception as e:
+        except Exception:  # TypeError
+            log.warning(format_exc())
+            log.warning(page.outer_html())
+            flow_link = None
+        if flow_link:
+            features['voting_ids'] = get_voting_ids(flow_link)
+        else:
             features['voting_ids'] = []
-            print(link, str(e))
         commitees_flow = {}
         commitees = page(COMMITEES_TABLE_SELECTOR)
         commitees = pq(commitees)
@@ -275,74 +324,72 @@ def download_bill(key):
     bd.update(get_bills_features(bd["link"]))
     return bd
 
-# setting sockets to run script anonymously
-socks.setdefaultproxy(
-    proxy_type=socks.PROXY_TYPE_SOCKS5,
-    addr="127.0.0.1", port=9050)
-socket.socket = socks.socksocket
+if __name__ == "__main__":
+    # setting sockets to run script anonymously
+    socks.setdefaultproxy(
+        proxy_type=socks.PROXY_TYPE_SOCKS5,
+        addr="127.0.0.1", port=9050)
+    socket.socket = socks.socksocket
 
-# open json with MP ids
-with open(PERSON_IDS_FILE) as json_data:
-        ids = json.load(json_data)
-        json_data.close()
+    # open json with MP ids
+    with open(PERSON_IDS_FILE) as json_data:
+            ids = json.load(json_data)
+            json_data.close()
 
-
-# this loop executes till all bills are downloaded
-flag = True
-while flag:
-    unique_docs = []
-    flag = False
-    # open output .csv file
-    general_info_csv = open(GENERAL_INFO_FILE, 'w')
-    general_info_writer = writer(general_info_csv)
-    general_info_writer.writerow(GENERAL_INFO_HEADERS)
-    committees_dict = {}
-    if os.path.isfile(DUMP_FILE):
-        with open(DUMP_FILE) as json_dump:
-            bills_dict = json.load(json_dump)
-            json_dump.close()
-    else:
-        bills_dict = {}
-    # print("Downloading bills...")
-    bills_downloaded = False
-    attempt = 1
-    while not bills_downloaded and attempt <= NUMBER_OF_ATTEMPTS:
-        try:
-            bill_list = rada.list_bills()
-            bills_downloaded = True
-        except Exception:
-            print("Cannot download bills list. Taking a looong rest...")
-            bills_downloaded = False
-            attempt += 1
-            time.sleep(LONG_SLEEP * 5)
-    if not bills_downloaded:
-        break
-    keys = list(bill_list.keys())
-    for i in range(len(keys)):
-        # print(str(i + 1) + " from " + str(len(keys)))
-        key = keys[i]
-        if key in bills_dict.keys():
-            now = int(datetime.datetime.now().strftime("%s"))
-            if (now - bills_dict[key]['update_time']) > UPDATE_LIMIT:
-                bills_dict[key] = download_bill(key)
+    # this loop executes till all bills are downloaded
+    scrapper_failed = True
+    while scrapper_failed:
+        scrapper_failed = False
+        unique_docs = []
+        # open output .csv file
+        general_info_csv = open(GENERAL_INFO_FILE, 'w')
+        general_info_writer = writer(general_info_csv)
+        general_info_writer.writerow(GENERAL_INFO_HEADERS)
+        committees_dict = {}
+        if os.path.isfile(DUMP_FILE):
+            with open(DUMP_FILE) as json_dump:
+                bills_dict = json.load(json_dump)
+                json_dump.close()
         else:
-            bills_dict[key] = download_bill(key)
-        if flag:
-            print("Something went wrong, taking a rest...")
-            time.sleep(LONG_SLEEP)
+            bills_dict = {}
+        log.debug("Downloading bills...")
+        bills_downloaded = False
+        attempt = 1
+        while not bills_downloaded and attempt <= NUMBER_OF_ATTEMPTS:
+            try:
+                bill_list = rada.list_bills()
+                bills_downloaded = True
+            except Exception:
+                log.warning("Cannot download bills list. Retrying later.")
+                bills_downloaded = False
+                attempt += 1
+                time.sleep(LONG_SLEEP * 5)
+        if not bills_downloaded:
             break
-        if bills_dict[key]['bill_docs'] != {}:
-            unique_docs = list(set(unique_docs +
-                                   bills_dict[key]['bill_docs']['name']))
-        if bills_dict[key]['flow_docs'] != {}:
-            unique_docs = list(set(unique_docs +
-                                   bills_dict[key]['flow_docs']['name']))
-        write_general_info(key)
-        append_committee(key)
-    general_info_csv.close()
+        keys = list(bill_list.keys())
+        for i in range(len(keys)):
+            log.info(str(i + 1) + " of " + str(len(keys)))
+            key = keys[i]
+            if key in bills_dict.keys():
+                now = int(datetime.datetime.now().strftime("%s"))
+                if (now - bills_dict[key]['update_time']) > UPDATE_LIMIT:
+                    bills_dict[key] = download_bill(key)
+            else:
+                bills_dict[key] = download_bill(key)
+            if scrapper_failed:
+                log.warning("Something went wrong, pausing before a retry")
+                time.sleep(LONG_SLEEP)
+                break
+            if getattr(bills_dict[key], 'bill_docs', {}):
+                unique_docs = list(set(unique_docs +
+                                       bills_dict[key]['bill_docs']['name']))
+            if getattr(bills_dict[key], 'flow_docs', {}):
+                unique_docs = list(set(unique_docs +
+                                       bills_dict[key]['flow_docs']['name']))
+            write_general_info(key)
+            append_committee(key)
+        general_info_csv.close()
 
-
-if bills_downloaded:
-    dump_dict()
-    write_committees_list()
-    write_docs_list()
+    if bills_downloaded:
+        write_committees_list()
+        write_docs_list()
