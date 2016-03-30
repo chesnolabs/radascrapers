@@ -83,19 +83,26 @@ log.basicConfig(
 log.debug('Debug mode active.')
 
 
+def html_body_present(html):
+    if pq(html)('body'):
+        return True
+    return False
+
+
 def pq_opener(url, **kwargs):
     attempt = 0
+    r = None
     while attempt < NUMBER_OF_ATTEMPTS:
         attempt += 1
-        time.sleep(SLEEP_TIME)
+        time.sleep(SLEEP_TIME*attempt**2)
         try:
             r = requests.get(url)
-            if r.status_code in HTTP_CODES_OK:
+            if r.status_code in HTTP_CODES_OK and html_body_present(r.text):
                 return r.text
         except Exception:
             log.warning(
                 "Failed to download {} with status {}"
-                .format(url, r.status_code))
+                .format(url, r and r.status_code or ""))
             log.warning(format_exc())
     global scrapper_failed
     scrapper_failed = True
@@ -228,13 +235,9 @@ def get_bills_features(link):
         features['edition'] = page(EDITION_SELECTOR).next().text()
         features['sphere'] = page(SPHERE_SELECTOR).next().text()
         committee_dd_text = page(MAIN_COMMITTEE_SELECTOR).next('dd').text()
-        if committee_strip(committee_dd_text) == '':
-            features['main_committee'] = \
-                committee_strip(committee_dd_text)
-        else: 
-            features['main_committee'] = NO_MAIN_COMMITTEE_STR
+        features['main_committee'] = committee_strip(committee_dd_text)
         if not features['main_committee']:
-            features['main_committee'] = committee_dd_text
+            features['main_committee'] = NO_MAIN_COMMITTEE_STR
             log.critical(link)
             committee_html = page(MAIN_COMMITTEE_SELECTOR).outer_html()
             if committee_html:
