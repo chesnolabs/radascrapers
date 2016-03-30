@@ -238,12 +238,6 @@ def get_bills_features(link):
         features['main_committee'] = committee_strip(committee_dd_text)
         if not features['main_committee']:
             features['main_committee'] = NO_MAIN_COMMITTEE_STR
-            log.critical(link)
-            committee_html = page(MAIN_COMMITTEE_SELECTOR).outer_html()
-            if committee_html:
-                log.critical(committee_html)
-            else:
-                log.critical(page.outer_html())
         other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
