@@ -81,23 +81,40 @@ log.basicConfig(
 log.debug('Debug mode active.')
 
 
-def pq_opener(url, **kwargs):
+def html_body_present(html):
+    if pq(html)('body'):
+        return True
+    return False
+
+
+def info_container_present(html):
+    if pq(html)('body div.zp-info'):
+        return True
+    return False
+
+
+def pq_opener(url, verifier=html_body_present, **kwargs):
     attempt = 0
+    r = None
     while attempt < NUMBER_OF_ATTEMPTS:
         attempt += 1
-        time.sleep(SLEEP_TIME)
+        time.sleep(SLEEP_TIME*attempt**2)
         try:
             r = requests.get(url)
-            if r.status_code in HTTP_CODES_OK:
+            if r.status_code in HTTP_CODES_OK and verifier(r.text):
                 return r.text
         except Exception:
             log.warning(
                 "Failed to download {} with status {}"
-                .format(url, r.status_code))
+                .format(url, r and r.status_code or ""))
             log.warning(format_exc())
     global scrapper_failed
     scrapper_failed = True
     return None
+
+
+def pq_opener_with_container_check(url, **kwargs):
+    return pq_opener(url, verifier=info_container_present)
 
 
 def change_date_format(s):
@@ -218,7 +235,7 @@ def get_voting_ids(flow_link):
 
 def get_bills_features(link):
         try:
-            page = pq(url=link, opener=pq_opener)
+            page = pq(url=link, opener=pq_opener_with_container_check)
         except Exception:
             return {}
         features = {}
