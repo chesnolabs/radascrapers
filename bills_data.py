@@ -72,6 +72,8 @@ GENERAL_INFO_HEADERS = ["number", "title", "URL", "type", "filing_date",
 COMMITTEES_LIST_HEADERS = ["committee", 'convocation']
 UNIQUE_DOCS_HEADER = ["name"]
 
+NO_MAIN_COMMITTEE_STR = 'Не вказано'
+
 argparser = argparse.ArgumentParser()
 argparser.add_argument('-d', '--debug', action='store_true', help='debug mode')
 args = argparser.parse_args()
@@ -243,16 +245,9 @@ def get_bills_features(link):
         features['edition'] = page(EDITION_SELECTOR).next().text()
         features['sphere'] = page(SPHERE_SELECTOR).next().text()
         committee_dd_text = page(MAIN_COMMITTEE_SELECTOR).next('dd').text()
-        features['main_committee'] = \
-            committee_strip(committee_dd_text)
+        features['main_committee'] = committee_strip(committee_dd_text)
         if not features['main_committee']:
-            features['main_committee'] = committee_dd_text
-            log.critical(link)
-            committee_html = page(MAIN_COMMITTEE_SELECTOR).outer_html()
-            if committee_html:
-                log.critical(committee_html)
-            else:
-                log.critical(page.outer_html())
+            features['main_committee'] = NO_MAIN_COMMITTEE_STR
         other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
