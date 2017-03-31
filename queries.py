@@ -2,12 +2,13 @@
 # coding:utf-8
 
 from pyquery import PyQuery as pq
+import urllib
 from csv import writer
 import re
 from time import sleep
 
 from rada import rada
-from .settings import OUTPUT_FOLDER
+from settings import OUTPUT_FOLDER
 
 OUTPUT_FILE = OUTPUT_FOLDER + 'queries.csv'
 SLEEP_TIME = 0.5
@@ -18,6 +19,8 @@ QUERY_LINK_TEMPLATE = 'http://w1.c1.rada.gov.ua/pls/zweb2/'
 NAME_SELECTOR = '.heading h3 b'
 DEPUTY_ID_RE = re.compile(
                     "http://itd.rada.gov.ua/mps/info/page/(?P<deputy_id>\d+)")
+
+QUERY_PROPERTIES_SELECTOR = 'td.THEAD32'
 
 
 ROW_HEADERS = (
@@ -30,6 +33,8 @@ ROW_HEADERS = (
     'whom',
     'title',
     'status',
+    'problem',
+    'query_type'
 )
 
 template_arguments = {
@@ -56,6 +61,7 @@ ROW_SUBSELECTORS = (
     'td.THEAD21:nth-child(4)',
 )
 
+QUERY_PROPERTIES_SELECTOR = 'td.THEAD32'
 
 
 print("getting deputies list")
@@ -76,8 +82,8 @@ for link in [link.attrib['href'] for link in mps]:
             template_arguments['type_id'] = type_id
             queries_link = LINK_TEMPLATE.format(**template_arguments)
             queries_page = pq(queries_link)
-            query_type = QUERY_TYPES[type_id]
-            print(names[mp_number], '-', query_type)
+            category = QUERY_TYPES[type_id]
+            print(names[mp_number], '-', category)
             for row in queries_page(ROW_SELECTOR):
                 row_pq = pq(row)
                 first_column = row_pq(ROW_SUBSELECTORS[0])
@@ -88,11 +94,32 @@ for link in [link.attrib['href'] for link in mps]:
                     query_date = first_column.text().split()[1].split('(')[0]
                     query_session = first_column.text().split(' ')[2] \
                         + " " + first_column.text().split(' ')[3]
-                    row_output = [names[mp_number], query_type, query_num,
+                    row_output = [names[mp_number], category, query_num,
                                   query_date, query_session, query_link, ]
                     for subselector in ROW_SUBSELECTORS[1:4]:
                         row_output.append(row_pq(subselector).text())
+                    problem = ""
+                    query_type = ""
                     if row_output[6]:
-                        csvwriter.writerow(row_output)
+                        sleep(SLEEP_TIME)
+                        #query_link = "http://w1.c1.rada.gov.ua/pls/zweb2/wcadr41D?kodzap=38449&koddep=17964"
+                        print(query_link)
+                        try:
+                            single_query_page = pq(query_link)
+                            for r in single_query_page(QUERY_PROPERTIES_SELECTOR):
+                                r = pq(r)
+                                if r.text() == "Проблематика":
+                                    problem = r.next().text()
+                                    print(problem)
+                                if r.text() == "Тип запиту":
+                                    query_type = r.next().text()
+                                    print(query_type)
+                        except urllib.error.HTTPError as err:
+                            if err.code == 404:
+                                r = ''
+                                problem = 'NA'
+                                query_type = 'NA'
+                    row_output += [problem, query_type]
+                    csvwriter.writerow(row_output)
     mp_number += 1
 fh.close()

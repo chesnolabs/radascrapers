@@ -39,6 +39,11 @@ COMMITEES_CELLS_SELECTOR = 'td'
 EDITION_SELECTOR = 'div.zp-info dt:contains("Редакція законопроекту")'
 SPHERE_SELECTOR = 'div.zp-info dt:contains("Рубрика законопроекту")'
 
+SHORT_CONCLUSION_RE = re.compile("\&pcaption=(?P<short_concl_name>.*)")
+SHORT_TEXT_RE = re.compile("Скорочений текст:(?P<text>.*)(Формалізований текст:)?")
+SHORT_FORMAL_TEXT_RE = re.compile("Формалізований текст:(?P<text>.*)$")
+
+
 VOTING_DATES_SELECTOR = 'div.fr_data'
 
 DATE_RE = re.compile("(?P<date>\d{2}.\d{2}.\d{4})")
@@ -158,6 +163,40 @@ def get_docs(x):
     link = START_URL + pq(x).attr("href")
     return name, date, link
 
+def get_short_docs(link):    
+    l = pq(link).parent()
+    href = l.attr("href")
+    text = SHORT_CONCLUSION_RE.search(href).group('short_concl_name')
+    date_matched = DATE_RE.search(text)
+    if date_matched is not None:
+        date_raw = date_matched.group("date")
+        date = change_date_format(date_matched.group("date"))
+    else:
+        date_raw = ""
+        date = ""
+    name = text.replace(date_raw, "")
+    url = START_URL + href
+    print(url)
+    short_page = pq(url)
+    #page_html = short_page.html().replace("\n"," ")
+    page_raw = short_page.text()
+    print(page_raw)
+    conclusion = DATE_RE.split(page_raw, maxsplit = 1)[-1].strip()
+    print(conclusion)
+    formal_splitted = conclusion.split("Формалізований текст:")
+    short_formal_conclusion = formal_splitted[-1].strip()
+    short_conclusion = formal_splitted[0].replace("Скорочений текст:", "").strip()
+    """short_conclusion_matched = SHORT_TEXT_RE.search(page_raw)
+    if short_conclusion_matched:
+        short_conclusion = short_conclusion_matched.group('text')
+    short_formal_conclusion_matched = SHORT_FORMAL_TEXT_RE.search(page_raw)
+    if short_formal_conclusion_matched:
+        short_formal_conclusion = short_formal_conclusion_matched.group('text')"""
+    #short_conclusion = [p.text.replace("Скорочений текст:").strip() for p in paragraphs if pq(p).text().startswith("Скорочений")]
+    #short_formal_conclusion = [p.text.replace("Формалізований текст:").strip() for p in paragraphs if pq(p).text().startswith("Формалізований")]
+    return {"name":name, "date":date, "short_text":short_conclusion, "formal_text":short_formal_conclusion}
+  
+
 
 def get_updates(x):
     x = pq(x)
@@ -179,6 +218,7 @@ def get_bills_features(link):
         features['main_committee'] = committee_strip(page(
                                         MAIN_COMMITTEE_SELECTOR
                                         ).next().text())
+        print(features['main_committee'])
         other_committees_raw = str(
             page(OTHERS_COMMITTEES_SELECTOR).next().children()
             ).replace('</li>', '').split('<li>')[1:]
@@ -205,6 +245,10 @@ def get_bills_features(link):
                                                      docs_list))
             features['flow_docs']['link'] = list(map(lambda x: x[2],
                                                      docs_list))
+        short_flows = page(FLOW_DOCS_SELECTOR).next()('li a img')
+        if short_flows is not None:
+            features['short_conclusions'] = list(map(get_short_docs, short_flows))
+            print(features['short_conclusions'])
         authors = page(AUTHORS_SELECTOR).text()
         if "Президент" in authors:
             features['initiator_type'] = "Президент України"
@@ -268,6 +312,7 @@ def download_bill(key):
     bd["type"] = bill_list[key][3]
     bd["update_time"] = int(datetime.datetime.now().strftime("%s"))
     bd.update(get_bills_features(bd["link"]))
+    #get_bills_features("http://w1.c1.rada.gov.ua/pls/zweb2/webproc4_1?pf3511=53138")
     return bd
 
 # setting sockets to run script anonymously
@@ -313,6 +358,7 @@ while flag:
     if not bills_downloaded:
         break
     keys = list(bill_list.keys())
+    # keys = ['4160', '3370', '1344', '3663']
     for i in range(len(keys)):
         # print(str(i + 1) + " from " + str(len(keys)))
         key = keys[i]
