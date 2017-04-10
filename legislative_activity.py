@@ -8,8 +8,8 @@ import urllib
 from rada import rada
 from settings import OUTPUT_FOLDER
 
-EDITS_FILE = OUTPUT_FOLDER + '/corrections.csv'
-OUTPUT_FILE = OUTPUT_FOLDER + '/legislative_activity.csv'
+EDITS_FILE = OUTPUT_FOLDER + 'corrections.csv'
+OUTPUT_FILE = OUTPUT_FOLDER + 'legislative_activity.csv'
 NAME_STRIP = " (народний депутат VIII скл.)"
 SLEEP_TIME = 0.5
 LINK_TEMPLATE = "http://w1.c1.rada.gov.ua/pls/pt2/reports.dep2?"\
