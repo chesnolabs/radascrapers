@@ -22,7 +22,7 @@ output = []
 for c in coms:
     c = pq(c)
     committee = c.text()
-    if "не входять" not in committee:
+    if "не входять" not in committee and "Спеціальна контрольна комісія" not in committee:
         href = c.attr("href")
         print(committee, href)
         com_id = COMID_RE.fullmatch(href).group("com_id")
